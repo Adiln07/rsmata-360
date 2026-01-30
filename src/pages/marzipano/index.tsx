@@ -1,8 +1,4 @@
-import {
-  faMaximize,
-  faMinimize,
-  faXmark,
-} from "@fortawesome/free-solid-svg-icons";
+import { faXmark } from "@fortawesome/free-solid-svg-icons";
 
 import { lantaiData } from "@/utils/floorData";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -10,9 +6,8 @@ import { useEffect, useRef, useState } from "react";
 
 const MarzipanoPage = () => {
   const panoRef = useRef(null);
-  const [showModal, setShowModal] = useState(false);
-  const [fullScreen, setFullScreen] = useState(false);
-  const [idRuangan, setIdRuangan] = useState(3);
+  const [showModal, setShowModal] = useState(true);
+  const [idRuangan, setIdRuangan] = useState(2);
 
   const scenesRef = useRef([]);
 
@@ -85,6 +80,29 @@ const MarzipanoPage = () => {
             });
           });
 
+          const navList = ruangan.hotspotNav || [];
+
+          navList.forEach((nav) => {
+            const wrapper = document.createElement("div");
+            wrapper.className = "relative";
+
+            const icon = document.createElement("div");
+            icon.className =
+              "w-7 h-7 bg-green-600 text-white flex items-center justify-center rounded-full cursor-pointer";
+            icon.innerText = "⮝"; // ikon navigasi
+
+            icon.addEventListener("click", () => {
+              handleSwitchScene(nav.goto);
+            });
+
+            wrapper.appendChild(icon);
+
+            scene.hotspotContainer().createHotspot(wrapper, {
+              yaw: nav.yaw,
+              pitch: nav.pitch,
+            });
+          });
+
           dynamicScenes.push({ id, scene });
         });
       });
@@ -95,31 +113,16 @@ const MarzipanoPage = () => {
     });
   }, [lantaiData]);
 
-  useEffect(() => {
-    if (!viewerRef.current) return;
+  const denah = lantaiData.find(
+    (item, index) => item.id === idRuangan,
+  )?.denahUrl;
 
-    const viewer = viewerRef.current;
-
-    setTimeout(() => {
-      viewer.updateSize();
-
-      scenesRef.current.forEach((s) => {
-        try {
-          s.scene.view().setParameters({});
-        } catch (_) {}
-      });
-    }, 200);
-  }, [fullScreen]);
+  // const position = findLantai.map((item, index) => item.position);
 
   return (
     <div className="flex justify-center items-center h-screen">
-      <div
-        className={`relative ${fullScreen ? "w-screen h-screen" : "xl:w-[60em] xl:h-[40em] h-[40em] w-[20em]    "}`}
-      >
-        <div
-          ref={panoRef}
-          className={`w-full h-full marzipano-container ${!fullScreen && "rounded-2xl"}`}
-        />
+      <div className={`relative w-screen h-screen`}>
+        <div ref={panoRef} className={`w-full h-full marzipano-container `} />
 
         <div className="absolute top-5 left-5 flex gap-2">
           <button
@@ -129,7 +132,7 @@ const MarzipanoPage = () => {
           >
             Pilih Lokasi
           </button>
-          {fullScreen ? (
+          {/* {fullScreen ? (
             <>
               <button
                 onClick={() => setFullScreen(false)}
@@ -151,13 +154,13 @@ const MarzipanoPage = () => {
                 <FontAwesomeIcon icon={faMaximize} />
               </button>
             </>
-          )}
+          )} */}
         </div>
 
         {showModal && (
-          <div className=" w-full h-full absolute top-0 bottom-0 z-50 flex items-center justify-center bg-black/50 rounded-2xl">
+          <div className=" w-full h-full absolute top-0 bottom-0 z-50 flex items-center justify-center bg-black/50 ">
             <div
-              className={`max-h-[90vh] ${fullScreen ? "w-2/4" : "w-3/4"} overflow-y-auto rounded-xl bg-white p-2 text-sm`}
+              className={`max-h-[90vh] w-7/8 overflow-y-auto rounded-xl bg-white p-2 text-sm`}
             >
               <div className=" flex items-center justify-between rounded-xl p-4 shadow-sm">
                 <h2 className="text-xl font-bold text-[#333333]">
@@ -183,7 +186,22 @@ const MarzipanoPage = () => {
                 ))}
               </div>
 
-              <div className="w-full grid  xl:grid-cols-3 gap-2">
+              <div className="relative hidden lg:block">
+                <img src={denah} alt="denah" className="w-full " />
+
+                {findLantai.map((item, index) => (
+                  <div
+                    className=" absolute  h-4 w-4 flex items-center px-1  bg-red-500 hover:bg-red-200 rounded-full cursor-pointer "
+                    style={{
+                      left: `${item.position.x}%`,
+                      top: `${item.position.y}%`,
+                    }}
+                    onClick={() => handleSwitchScene(item.sceneId)}
+                  ></div>
+                ))}
+              </div>
+
+              <div className="w-full grid lg:hidden xl:grid-cols-3 gap-2">
                 {findLantai.map((item: any, index: number) => (
                   <p
                     key={index}
