@@ -188,7 +188,7 @@ const MarzipanoPage = () => {
 
                 {findLantai.map((item, index) => (
                   <div
-                    className=" absolute  lg:h-4 lg:w-4 h-1 w-1 flex items-center px-1  bg-red-500 hover:bg-red-200 rounded-full cursor-pointer "
+                    className=" absolute  lg:h-4 lg:w-4  flex items-center px-1  bg-red-500 hover:bg-red-200 rounded-full cursor-pointer "
                     style={{
                       left: `${item.position.x}%`,
                       top: `${item.position.y}%`,
