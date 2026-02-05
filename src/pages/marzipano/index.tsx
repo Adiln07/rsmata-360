@@ -1,5 +1,5 @@
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
-
+import panzoom from "panzoom";
 import { lantaiData } from "@/utils/floorData";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useEffect, useRef, useState } from "react";
@@ -10,6 +10,33 @@ const MarzipanoPage = () => {
   const [idRuangan, setIdRuangan] = useState(2);
 
   const scenesRef = useRef([]);
+
+  const denah = lantaiData.find(
+    (item, index) => item.id === idRuangan,
+  )?.denahUrl;
+
+  //  ==== PANZOOM =====
+
+  const containerRef = useRef(null);
+  const imgWrapperRef = useRef(null);
+
+  useEffect(() => {
+    // Hanya jalankan panzoom jika lebar layar di bawah breakpoint 'lg' (1024px)
+    const isMobile = window.innerWidth < 1024;
+
+    if (!imgWrapperRef.current || !isMobile) return;
+
+    const pan = panzoom(imgWrapperRef.current, {
+      maxZoom: 4,
+      minZoom: 1,
+      bounds: true,
+      boundsPadding: 0,
+      // Agar tidak mengganggu scroll modal di mobile:
+      // beforeWheel: (e) => true, // biarkan scroll browser bekerja jika tidak sedang pinch-zoom
+    });
+
+    return () => pan.dispose();
+  }, [denah, idRuangan]);
 
   const handleSwitchScene = (sceneId) => {
     const findScene = scenesRef.current.find((s) => s.id === sceneId);
@@ -113,12 +140,6 @@ const MarzipanoPage = () => {
     });
   }, [lantaiData]);
 
-  const denah = lantaiData.find(
-    (item, index) => item.id === idRuangan,
-  )?.denahUrl;
-
-  // const position = findLantai.map((item, index) => item.position);
-
   return (
     <div className="flex justify-center items-center h-screen">
       <div className={`relative w-screen h-screen`}>
@@ -132,35 +153,12 @@ const MarzipanoPage = () => {
           >
             Pilih Lokasi
           </button>
-          {/* {fullScreen ? (
-            <>
-              <button
-                onClick={() => setFullScreen(false)}
-                className="  text-white rounded-lg text-lg bg-green-600 px-2  shadow-lg"
-                style={{ zIndex: 10 }}
-              >
-                {" "}
-                <FontAwesomeIcon icon={faMinimize} />
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => setFullScreen(true)}
-                className=" text-white rounded-lg text-lg bg-green-600 px-2  shadow-lg"
-                style={{ zIndex: 10 }}
-              >
-                {" "}
-                <FontAwesomeIcon icon={faMaximize} />
-              </button>
-            </>
-          )} */}
         </div>
 
         {showModal && (
           <div className=" w-full h-full absolute top-0 bottom-0 z-50 flex items-center justify-center bg-black/50 ">
             <div
-              className={`max-h-[90vh] w-7/8 overflow-y-auto rounded-xl bg-white p-2 text-sm`}
+              className={`max-h-[90vh] w-7/8 lg:overflow-y-auto overflow-hidden rounded-xl bg-white p-2 text-sm`}
             >
               <div className=" flex items-center justify-between rounded-xl p-4 shadow-sm">
                 <h2 className="text-xl font-bold text-[#333333]">
@@ -173,7 +171,6 @@ const MarzipanoPage = () => {
                   <FontAwesomeIcon icon={faXmark} />
                 </button>
               </div>
-
               <div className="w-full flex-wrap xl:flex-nowrap flex gap-2 my-5 justify-center">
                 {lantaiData?.map((item: any) => (
                   <button
@@ -186,12 +183,12 @@ const MarzipanoPage = () => {
                 ))}
               </div>
 
-              <div className="relative hidden lg:block">
+              <div className="relative hidden lg:block overflow-hidden">
                 <img src={denah} alt="denah" className="w-full " />
 
                 {findLantai.map((item, index) => (
                   <div
-                    className=" absolute  h-4 w-4 flex items-center px-1  bg-red-500 hover:bg-red-200 rounded-full cursor-pointer "
+                    className=" absolute  lg:h-4 lg:w-4 h-1 w-1 flex items-center px-1  bg-red-500 hover:bg-red-200 rounded-full cursor-pointer "
                     style={{
                       left: `${item.position.x}%`,
                       top: `${item.position.y}%`,
@@ -201,16 +198,35 @@ const MarzipanoPage = () => {
                 ))}
               </div>
 
-              <div className="w-full grid lg:hidden xl:grid-cols-3 gap-2">
-                {findLantai.map((item: any, index: number) => (
-                  <p
-                    key={index}
-                    onClick={() => handleSwitchScene(item.sceneId)}
-                    className="bg-blue-400 text-center py-2 text-white rounded-xl cursor-pointer hover:bg-blue-600"
-                  >
-                    {item.loc}
-                  </p>
-                ))}
+              <div
+                ref={containerRef}
+                className="relative  lg:hidden overflow-hidden border"
+                style={{ width: "100%", height: "100%" }}
+              >
+                <div
+                  ref={imgWrapperRef}
+                  style={{ width: "fit-content", height: "fit-content" }}
+                >
+                  <img
+                    src={denah}
+                    alt="denah"
+                    className="pointer-events-none select-none"
+                    draggable={false}
+                    style={{ width: "100%", height: "auto" }}
+                  />
+
+                  {findLantai.map((item, index) => (
+                    <div
+                      key={index}
+                      className="absolute lg:h-4 lg:w-4 w-2 h-2 bg-red-500 hover:bg-red-300 rounded-full cursor-pointer"
+                      style={{
+                        left: `${item.position.x}%`,
+                        top: `${item.position.y}%`,
+                      }}
+                      onClick={() => handleSwitchScene(item.sceneId)}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           </div>
