@@ -1,3 +1,239 @@
-export default function Home() {
-  return <div>Home</div>;
-}
+import { faXmark } from "@fortawesome/free-solid-svg-icons";
+import panzoom from "panzoom";
+import { lantaiData } from "@/utils/floorData";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { useEffect, useRef, useState } from "react";
+
+const MarzipanoPage = () => {
+  const panoRef = useRef(null);
+  const [showModal, setShowModal] = useState(true);
+  const [idRuangan, setIdRuangan] = useState(2);
+
+  const scenesRef = useRef([]);
+
+  const denah = lantaiData.find(
+    (item, index) => item.id === idRuangan,
+  )?.denahUrl;
+
+  //  ==== PANZOOM =====
+
+  const containerRef = useRef(null);
+  const imgWrapperRef = useRef(null);
+
+  useEffect(() => {
+    // Hanya jalankan panzoom jika lebar layar di bawah breakpoint 'lg' (1024px)
+    const isMobile = window.innerWidth < 1024;
+
+    if (!imgWrapperRef.current || !isMobile) return;
+
+    const pan = panzoom(imgWrapperRef.current, {
+      maxZoom: 4,
+      minZoom: 1,
+      bounds: true,
+      boundsPadding: 0,
+      // Agar tidak mengganggu scroll modal di mobile:
+      // beforeWheel: (e) => true, // biarkan scroll browser bekerja jika tidak sedang pinch-zoom
+    });
+
+    return () => pan.dispose();
+  }, [denah, idRuangan]);
+
+  const handleSwitchScene = (sceneId) => {
+    const findScene = scenesRef.current.find((s) => s.id === sceneId);
+    if (!findScene) return;
+
+    findScene.scene.switchTo();
+    setShowModal(false);
+  };
+
+  const findLantai = lantaiData[idRuangan].ruangan.map((item, index) => ({
+    ...item,
+    sceneId: `${idRuangan}-${index}`, // ← ID yang terhubung ke scene
+  }));
+
+  const viewerRef = useRef(null);
+
+  useEffect(() => {
+    import("marzipano").then((m) => {
+      const MarzipanoLib = m.default;
+
+      const viewer = new MarzipanoLib.Viewer(panoRef.current);
+      viewerRef.current = viewer;
+
+      const dynamicScenes = [];
+
+      lantaiData.forEach((lantai, lantaiIndex) => {
+        lantai.ruangan.forEach((ruangan, ruanganIndex) => {
+          if (!ruangan.url) return; // skip kosong
+
+          const id = `${lantaiIndex}-${ruanganIndex}`;
+
+          const source = MarzipanoLib.ImageUrlSource.fromString(ruangan.url);
+          const geometry = new MarzipanoLib.EquirectGeometry([{ width: 4096 }]);
+          const limiter = MarzipanoLib.RectilinearView.limit.traditional(
+            4096,
+            (100 * Math.PI) / 180,
+          );
+          const view = new MarzipanoLib.RectilinearView({}, limiter);
+
+          const scene = viewer.createScene({ source, geometry, view });
+
+          const hotspotList = ruangan.hotspot || [];
+
+          hotspotList.forEach((spot) => {
+            const wrapper = document.createElement("div");
+            wrapper.className = "relative";
+
+            const icon = document.createElement("div");
+            icon.className =
+              "w-7 h-7 bg-blue-600 text-white text-sm flex items-center justify-center rounded-full cursor-pointer shadow-lg";
+            icon.innerText = "i";
+
+            const tooltip = document.createElement("div");
+            tooltip.className =
+              "hidden absolute left-8 top-1 bg-white text-black p-2 rounded-lg shadow-xl text-xs w-[150px] border border-gray-300 z-50";
+            tooltip.innerHTML = `<b>${spot.label}</b><br>${spot.description}`;
+
+            icon.addEventListener("click", () => {
+              tooltip.classList.toggle("hidden");
+            });
+
+            wrapper.appendChild(icon);
+            wrapper.appendChild(tooltip);
+
+            scene.hotspotContainer().createHotspot(wrapper, {
+              yaw: spot.yaw,
+              pitch: spot.pitch,
+            });
+          });
+
+          const navList = ruangan.hotspotNav || [];
+
+          navList.forEach((nav) => {
+            const wrapper = document.createElement("div");
+            wrapper.className = "relative";
+
+            const icon = document.createElement("div");
+            icon.className =
+              "w-7 h-7 bg-green-600 text-white flex items-center justify-center rounded-full cursor-pointer";
+            icon.innerText = "⮝"; // ikon navigasi
+
+            icon.addEventListener("click", () => {
+              handleSwitchScene(nav.goto);
+            });
+
+            wrapper.appendChild(icon);
+
+            scene.hotspotContainer().createHotspot(wrapper, {
+              yaw: nav.yaw,
+              pitch: nav.pitch,
+            });
+          });
+
+          dynamicScenes.push({ id, scene });
+        });
+      });
+
+      scenesRef.current = dynamicScenes;
+
+      dynamicScenes[0]?.scene.switchTo();
+    });
+  }, [lantaiData]);
+
+  return (
+    <div className="flex justify-center items-center h-screen">
+      <div className={`relative w-screen h-screen`}>
+        <div ref={panoRef} className={`w-full h-full marzipano-container `} />
+
+        <div className="absolute top-5 left-5 flex gap-2">
+          <button
+            onClick={() => setShowModal(true)}
+            className=" bg-blue-600 text-white px-4 py-2 rounded-xl shadow-lg cursor-pointer"
+            style={{ zIndex: 10 }}
+          >
+            Pilih Lokasi
+          </button>
+        </div>
+
+        {showModal && (
+          <div className=" w-full h-full absolute top-0 bottom-0 z-50 flex items-center justify-center bg-black/50 ">
+            <div
+              className={`max-h-[90vh] w-7/8 lg:overflow-y-auto overflow-hidden rounded-xl bg-white p-2 text-sm`}
+            >
+              <div className=" flex items-center justify-between rounded-xl p-4 shadow-sm">
+                <h2 className="text-xl font-bold text-[#333333]">
+                  Pilih Ruangan
+                </h2>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="text-xl font-semibold text-gray-500 hover:text-gray-700"
+                >
+                  <FontAwesomeIcon icon={faXmark} />
+                </button>
+              </div>
+              <div className="w-full flex-wrap xl:flex-nowrap flex gap-2 my-5 justify-center">
+                {lantaiData?.map((item: any) => (
+                  <button
+                    key={item?.id}
+                    className={`w-1/3 bg-gray-400 hover:bg-gray-600 py-2 text-white rounded-lg cursor-pointer`}
+                    onClick={() => setIdRuangan(item.id)}
+                  >
+                    <p>{item?.name}</p>
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative hidden lg:block overflow-hidden">
+                <img src={denah} alt="denah" className="w-full " />
+
+                {findLantai.map((item, index) => (
+                  <div
+                    className=" absolute  lg:h-4 lg:w-4  flex items-center px-1  bg-red-500 hover:bg-red-200 rounded-full cursor-pointer "
+                    style={{
+                      left: `${item.position.x}%`,
+                      top: `${item.position.y}%`,
+                    }}
+                    onClick={() => handleSwitchScene(item.sceneId)}
+                  ></div>
+                ))}
+              </div>
+
+              <div
+                ref={containerRef}
+                className="relative  lg:hidden overflow-hidden border"
+                style={{ width: "100%", height: "100%" }}
+              >
+                <div
+                  ref={imgWrapperRef}
+                  style={{ width: "fit-content", height: "fit-content" }}
+                >
+                  <img
+                    src={denah}
+                    alt="denah"
+                    className="pointer-events-none select-none"
+                    draggable={false}
+                    style={{ width: "100%", height: "auto" }}
+                  />
+
+                  {findLantai.map((item, index) => (
+                    <div
+                      key={index}
+                      className="absolute lg:h-4 lg:w-4 w-2 h-2 bg-red-500 hover:bg-red-300 rounded-full cursor-pointer"
+                      style={{
+                        left: `${item.position.x}%`,
+                        top: `${item.position.y}%`,
+                      }}
+                      onClick={() => handleSwitchScene(item.sceneId)}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default MarzipanoPage;

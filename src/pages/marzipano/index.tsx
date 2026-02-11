@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 const MarzipanoPage = () => {
   const panoRef = useRef(null);
   const [showModal, setShowModal] = useState(true);
-  const [idRuangan, setIdRuangan] = useState(2);
+  const [idRuangan, setIdRuangan] = useState(3);
 
   const scenesRef = useRef([]);
 
@@ -91,11 +91,15 @@ const MarzipanoPage = () => {
 
             const tooltip = document.createElement("div");
             tooltip.className =
-              "hidden absolute left-8 top-1 bg-white text-black p-2 rounded-lg shadow-xl text-xs w-[150px] border border-gray-300 z-50";
+              "absolute left-8 top-1 bg-white text-black p-2 rounded-lg shadow-xl text-xs w-[150px] border border-gray-300 z-50 opacity-0 pointer-events-none transition-opacity duration-200";
             tooltip.innerHTML = `<b>${spot.label}</b><br>${spot.description}`;
 
-            icon.addEventListener("click", () => {
-              tooltip.classList.toggle("hidden");
+            wrapper.addEventListener("mouseenter", () => {
+              tooltip.style.opacity = "1";
+            });
+
+            wrapper.addEventListener("mouseleave", () => {
+              tooltip.style.opacity = "0";
             });
 
             wrapper.appendChild(icon);
@@ -111,18 +115,29 @@ const MarzipanoPage = () => {
 
           navList.forEach((nav) => {
             const wrapper = document.createElement("div");
-            wrapper.className = "relative";
+            wrapper.className = "relative group";
+
+            const [lantaiIdx, ruanganIdx] = nav.goto.split("-").map(Number);
+            const targetLoc =
+              lantaiData[lantaiIdx].ruangan[ruanganIdx]?.loc || "Unknown";
 
             const icon = document.createElement("div");
             icon.className =
-              "w-7 h-7 bg-green-600 text-white flex items-center justify-center rounded-full cursor-pointer";
-            icon.innerText = "⮝"; // ikon navigasi
+              "w-7 h-7 bg-orange-600 text-white flex items-center justify-center rounded-full cursor-pointer";
+            icon.innerText = "⮝";
+
+            const tooltip = document.createElement("div");
+            tooltip.className =
+              "absolute -top-10 left-1/2 -translate-x-1/2 bg-orange-300 border border-orange-500 text-white text-xs px-2.5 py-1.5 rounded-md shadow-md opacity-0 group-hover:opacity-100 transition-all duration-200 scale-95 group-hover:scale-100 whitespace-nowrap pointer-events-none font-semibold";
+
+            tooltip.innerText = targetLoc;
 
             icon.addEventListener("click", () => {
               handleSwitchScene(nav.goto);
             });
 
             wrapper.appendChild(icon);
+            wrapper.appendChild(tooltip);
 
             scene.hotspotContainer().createHotspot(wrapper, {
               yaw: nav.yaw,
