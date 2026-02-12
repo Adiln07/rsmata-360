@@ -1,4 +1,8 @@
-import { faXmark } from "@fortawesome/free-solid-svg-icons";
+import {
+  faAngleDown,
+  faAngleUp,
+  faXmark,
+} from "@fortawesome/free-solid-svg-icons";
 import panzoom from "panzoom";
 import { lantaiData } from "@/utils/floorData";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -7,9 +11,13 @@ import { useEffect, useRef, useState } from "react";
 const MarzipanoPage = () => {
   const panoRef = useRef(null);
   const [showModal, setShowModal] = useState(true);
-  const [idRuangan, setIdRuangan] = useState(3);
+  const [idRuangan, setIdRuangan] = useState(2);
+  const [openDropdown, setOpenDropdown] = useState(true);
+  const [selected, setSelected] = useState("");
 
   const scenesRef = useRef([]);
+
+  const toggleDropdown = () => setOpenDropdown(!openDropdown);
 
   const denah = lantaiData.find(
     (item, index) => item.id === idRuangan,
@@ -38,10 +46,13 @@ const MarzipanoPage = () => {
     return () => pan.dispose();
   }, [denah, idRuangan]);
 
-  const handleSwitchScene = (sceneId) => {
+  console.log("isi selected: ", selected);
+
+  const handleSwitchScene = (sceneId, loc) => {
     const findScene = scenesRef.current.find((s) => s.id === sceneId);
     if (!findScene) return;
 
+    setSelected(loc);
     findScene.scene.switchTo();
     setShowModal(false);
   };
@@ -86,7 +97,7 @@ const MarzipanoPage = () => {
 
             const icon = document.createElement("div");
             icon.className =
-              "w-7 h-7 bg-blue-600 text-white text-sm flex items-center justify-center rounded-full cursor-pointer shadow-lg";
+              "w-10 h-10 bg-blue-600 text-white text-sm flex items-center justify-center rounded-full cursor-pointer shadow-lg";
             icon.innerText = "i";
 
             const tooltip = document.createElement("div");
@@ -123,7 +134,7 @@ const MarzipanoPage = () => {
 
             const icon = document.createElement("div");
             icon.className =
-              "w-7 h-7 bg-orange-600 text-white flex items-center justify-center rounded-full cursor-pointer";
+              "w-10 h-10 bg-orange-600 text-white flex items-center justify-center rounded-full cursor-pointer";
             icon.innerText = "⮝";
 
             const tooltip = document.createElement("div");
@@ -133,7 +144,7 @@ const MarzipanoPage = () => {
             tooltip.innerText = targetLoc;
 
             icon.addEventListener("click", () => {
-              handleSwitchScene(nav.goto);
+              handleSwitchScene(nav.goto, targetLoc);
             });
 
             wrapper.appendChild(icon);
@@ -160,14 +171,75 @@ const MarzipanoPage = () => {
       <div className={`relative w-screen h-screen`}>
         <div ref={panoRef} className={`w-full h-full marzipano-container `} />
 
-        <div className="absolute top-5 left-5 flex gap-2">
+        <div className="absolute top-5 left-5 gap-10 flex  justify-center flex-col">
           <button
             onClick={() => setShowModal(true)}
-            className=" bg-blue-600 text-white px-4 py-2 rounded-xl shadow-lg cursor-pointer"
+            className=" bg-blue-600 text-white w-26 py-2 rounded-lg shadow-lg cursor-pointer"
             style={{ zIndex: 10 }}
           >
-            Pilih Lokasi
+            Pilih Lantai
           </button>
+          {/* <div>
+            <div
+              className="bg-white w-[200px] rounded-lg py-1 flex justify-between px-2 "
+              onClick={toggleDropdown}
+            >
+              <p className="text-base">
+                {selected ? selected : "Choose A Room"}
+              </p>
+              <div>
+                {openDropdown ? (
+                  <FontAwesomeIcon icon={faAngleUp} />
+                ) : (
+                  <FontAwesomeIcon icon={faAngleDown} />
+                )}
+              </div>
+            </div>
+            {openDropdown && (
+              <div className="bg-white">
+                {findLantai.map((item, index) => (
+                  <div
+                    className=" cursor-pointer"
+                    onClick={() => handleSwitchScene(item.sceneId, item.loc)}
+                  >
+                    {item.loc}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div> */}
+          <div className="relative w-[220px]">
+            <div
+              className="bg-white border border-gray-300 rounded-md py-2 px-3 flex justify-between items-center cursor-pointer shadow-sm hover:border-gray-400 transition duration-150"
+              onClick={toggleDropdown}
+            >
+              <p className="text-sm font-medium text-gray-700">
+                {selected ? selected : "Choose a Room"}
+              </p>
+
+              <div className="text-gray-600">
+                {openDropdown ? (
+                  <FontAwesomeIcon icon={faAngleUp} />
+                ) : (
+                  <FontAwesomeIcon icon={faAngleDown} />
+                )}
+              </div>
+            </div>
+
+            {openDropdown && (
+              <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-20 max-h-60 overflow-auto animate-fadeIn">
+                {findLantai.map((item, index) => (
+                  <div
+                    key={index}
+                    className="py-2 px-3 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer transition"
+                    onClick={() => handleSwitchScene(item.sceneId, item.loc)}
+                  >
+                    {item.loc}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {showModal && (
@@ -208,7 +280,7 @@ const MarzipanoPage = () => {
                       left: `${item.position.x}%`,
                       top: `${item.position.y}%`,
                     }}
-                    onClick={() => handleSwitchScene(item.sceneId)}
+                    onClick={() => handleSwitchScene(item.sceneId, item.loc)}
                   ></div>
                 ))}
               </div>
@@ -238,7 +310,7 @@ const MarzipanoPage = () => {
                         left: `${item.position.x}%`,
                         top: `${item.position.y}%`,
                       }}
-                      onClick={() => handleSwitchScene(item.sceneId)}
+                      onClick={() => handleSwitchScene(item.sceneId, item.loc)}
                     />
                   ))}
                 </div>
