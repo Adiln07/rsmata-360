@@ -1,19 +1,60 @@
-import { faXmark } from "@fortawesome/free-solid-svg-icons";
+import {
+  faAngleDown,
+  faAngleUp,
+  faXmark,
+} from "@fortawesome/free-solid-svg-icons";
 import panzoom from "panzoom";
-import { lantaiData } from "@/utils/floorData";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useEffect, useRef, useState } from "react";
+import { useMapStore } from "@/store/mapStore";
 
 const MarzipanoPage = () => {
   const panoRef = useRef(null);
   const [showModal, setShowModal] = useState(true);
   const [idRuangan, setIdRuangan] = useState(2);
+  const [openDropdown, setOpenDropdown] = useState(true);
+  const [selected, setSelected] = useState("");
 
   const scenesRef = useRef([]);
 
-  const denah = lantaiData.find(
-    (item, index) => item.id === idRuangan,
-  )?.denahUrl;
+  const toggleDropdown = () => setOpenDropdown(!openDropdown);
+
+  console.log("selected: ", selected);
+
+  // Zustand
+
+  const floors = useMapStore((state) => state.floors);
+  const floorById = useMapStore((state) => state.floorById);
+  const floorId = useMapStore((state) => state.floorId);
+
+  const fetchGetAllFloorsWithRooms = useMapStore(
+    (state) => state.fetchGetAllFloorsWithRooms,
+  );
+  const fetchGetFloorsWithRoomById = useMapStore(
+    (state) => state.fetchGetFloorsWithRoomById,
+  );
+  const setFloorId = useMapStore((state) => state.setFloorId);
+
+  const ruanganSet = async (id: number) => {
+    setIdRuangan(id);
+    setFloorId(id);
+  };
+
+  useEffect(() => {
+    fetchGetAllFloorsWithRooms();
+    fetchGetFloorsWithRoomById(Number(floorId));
+  }, [floorId]);
+
+  const denah = `http://localhost:8080${floorById?.floor.floor_plan}`;
+
+  // const denah = lantaiData.find(
+  //   (item, index) => item.id === idRuangan,
+  // )?.denahUrl;
+
+  // const floorPlan =
+  //   floors?.floors.find((item, index) => item.id === idRuangan)?.floor_plan ||
+  //   "";
+  // const floorPlan = "asd";
 
   //  ==== PANZOOM =====
 
@@ -36,19 +77,25 @@ const MarzipanoPage = () => {
     });
 
     return () => pan.dispose();
-  }, [denah, idRuangan]);
+  }, [denah, floorId]);
 
-  const handleSwitchScene = (sceneId) => {
-    const findScene = scenesRef.current.find((s) => s.id === sceneId);
+  const handleSwitchScene = (sceneId, loc) => {
+    // const findScene = scenesRef.current.find((s) => s.id === sceneId);
+    const findScene = scenesRef.current.find(
+      (s) => String(s.id) === String(sceneId),
+    );
     if (!findScene) return;
 
+    setSelected(loc);
     findScene.scene.switchTo();
     setShowModal(false);
   };
 
-  const findLantai = lantaiData[idRuangan].ruangan.map((item, index) => ({
+  const Allfloors = floors?.floors;
+
+  const floorRoom = floorById?.floor.rooms.map((item, index) => ({
     ...item,
-    sceneId: `${idRuangan}-${index}`, // ← ID yang terhubung ke scene
+    sceneId: item.id,
   }));
 
   const viewerRef = useRef(null);
@@ -62,13 +109,15 @@ const MarzipanoPage = () => {
 
       const dynamicScenes = [];
 
-      lantaiData.forEach((lantai, lantaiIndex) => {
-        lantai.ruangan.forEach((ruangan, ruanganIndex) => {
-          if (!ruangan.url) return; // skip kosong
+      Allfloors?.forEach((floor, floorIndex) => {
+        floor.rooms.forEach((room, roomIndex) => {
+          if (!room.image) return; // skip kosong
 
-          const id = `${lantaiIndex}-${ruanganIndex}`;
+          const id = room.id;
 
-          const source = MarzipanoLib.ImageUrlSource.fromString(ruangan.url);
+          const source = MarzipanoLib.ImageUrlSource.fromString(
+            `http://localhost:8080${room.image}`,
+          );
           const geometry = new MarzipanoLib.EquirectGeometry([{ width: 4096 }]);
           const limiter = MarzipanoLib.RectilinearView.limit.traditional(
             4096,
@@ -78,24 +127,28 @@ const MarzipanoPage = () => {
 
           const scene = viewer.createScene({ source, geometry, view });
 
-          const hotspotList = ruangan.hotspot || [];
+          const hotspotList = room.hotspot_information || [];
 
-          hotspotList.forEach((spot) => {
+          hotspotList?.forEach((spot) => {
             const wrapper = document.createElement("div");
             wrapper.className = "relative";
 
             const icon = document.createElement("div");
             icon.className =
-              "w-7 h-7 bg-blue-600 text-white text-sm flex items-center justify-center rounded-full cursor-pointer shadow-lg";
+              "w-10 h-10 bg-blue-600 text-white text-sm flex items-center justify-center rounded-full cursor-pointer shadow-lg";
             icon.innerText = "i";
 
             const tooltip = document.createElement("div");
             tooltip.className =
-              "hidden absolute left-8 top-1 bg-white text-black p-2 rounded-lg shadow-xl text-xs w-[150px] border border-gray-300 z-50";
+              "absolute left-8 top-1 bg-white text-black p-2 rounded-lg shadow-xl text-xs w-[150px] border border-gray-300 z-50 opacity-0 pointer-events-none transition-opacity duration-200";
             tooltip.innerHTML = `<b>${spot.label}</b><br>${spot.description}`;
 
-            icon.addEventListener("click", () => {
-              tooltip.classList.toggle("hidden");
+            wrapper.addEventListener("mouseenter", () => {
+              tooltip.style.opacity = "1";
+            });
+
+            wrapper.addEventListener("mouseleave", () => {
+              tooltip.style.opacity = "0";
             });
 
             wrapper.appendChild(icon);
@@ -107,22 +160,35 @@ const MarzipanoPage = () => {
             });
           });
 
-          const navList = ruangan.hotspotNav || [];
+          const navList = room.hotspot_navigation || [];
 
           navList.forEach((nav) => {
             const wrapper = document.createElement("div");
-            wrapper.className = "relative";
+            wrapper.className = "relative group";
+
+            // const [lantaiIdx, ruanganIdx] = nav.goto.split("-").map(Number);
+            // const targetLoc =
+            //   lantaiData[lantaiIdx].ruangan[ruanganIdx]?.loc || "Unknown";
+            const targetId = nav.target_room_id;
+            const targetLoc = nav.target_room_label;
 
             const icon = document.createElement("div");
             icon.className =
-              "w-7 h-7 bg-green-600 text-white flex items-center justify-center rounded-full cursor-pointer";
-            icon.innerText = "⮝"; // ikon navigasi
+              "w-10 h-10 bg-orange-600 text-white flex items-center justify-center rounded-full cursor-pointer";
+            icon.innerText = "⮝";
+
+            const tooltip = document.createElement("div");
+            tooltip.className =
+              "absolute -top-10 left-1/2 -translate-x-1/2 bg-orange-300 border border-orange-500 text-white text-xs px-2.5 py-1.5 rounded-md shadow-md opacity-0 group-hover:opacity-100 transition-all duration-200 scale-95 group-hover:scale-100 whitespace-nowrap pointer-events-none font-semibold";
+
+            tooltip.innerText = targetLoc;
 
             icon.addEventListener("click", () => {
-              handleSwitchScene(nav.goto);
+              handleSwitchScene(targetId, targetLoc);
             });
 
             wrapper.appendChild(icon);
+            wrapper.appendChild(tooltip);
 
             scene.hotspotContainer().createHotspot(wrapper, {
               yaw: nav.yaw,
@@ -138,21 +204,158 @@ const MarzipanoPage = () => {
 
       dynamicScenes[0]?.scene.switchTo();
     });
-  }, [lantaiData]);
+  }, [Allfloors]);
+
+  // * Use Effect Db Integration
+
+  // useEffect(() => {
+  //   import("marzipano").then((m) => {
+  //     const MarzipanoLib = m.default;
+
+  //     const viewer = new MarzipanoLib.Viewer(panoRef.current);
+  //     viewerRef.current = viewer;
+
+  //     const dynamicScenes = [];
+
+  //     floors?.floors.forEach((floor, floorIndex) => {
+  //       floor.rooms.forEach((room, roomIndex) => {
+  //         if (!room.url) return; // skip kosong
+
+  //         const id = `${floorIndex}-${roomIndex}`;
+
+  //         const source = MarzipanoLib.ImageUrlSource.fromString(room.image);
+  //         const geometry = new MarzipanoLib.EquirectGeometry([{ width: 4096 }]);
+  //         const limiter = MarzipanoLib.RectilinearView.limit.traditional(
+  //           4096,
+  //           (100 * Math.PI) / 180,
+  //         );
+  //         const view = new MarzipanoLib.RectilinearView({}, limiter);
+
+  //         const scene = viewer.createScene({ source, geometry, view });
+
+  //         const hotspotList = ruangan.hotspot || [];
+
+  //         hotspotList.forEach((spot) => {
+  //           const wrapper = document.createElement("div");
+  //           wrapper.className = "relative";
+
+  //           const icon = document.createElement("div");
+  //           icon.className =
+  //             "w-10 h-10 bg-blue-600 text-white text-sm flex items-center justify-center rounded-full cursor-pointer shadow-lg";
+  //           icon.innerText = "i";
+
+  //           const tooltip = document.createElement("div");
+  //           tooltip.className =
+  //             "absolute left-8 top-1 bg-white text-black p-2 rounded-lg shadow-xl text-xs w-[150px] border border-gray-300 z-50 opacity-0 pointer-events-none transition-opacity duration-200";
+  //           tooltip.innerHTML = `<b>${spot.label}</b><br>${spot.description}`;
+
+  //           wrapper.addEventListener("mouseenter", () => {
+  //             tooltip.style.opacity = "1";
+  //           });
+
+  //           wrapper.addEventListener("mouseleave", () => {
+  //             tooltip.style.opacity = "0";
+  //           });
+
+  //           wrapper.appendChild(icon);
+  //           wrapper.appendChild(tooltip);
+
+  //           scene.hotspotContainer().createHotspot(wrapper, {
+  //             yaw: spot.yaw,
+  //             pitch: spot.pitch,
+  //           });
+  //         });
+
+  //         const navList = ruangan.hotspotNav || [];
+
+  //         navList.forEach((nav) => {
+  //           const wrapper = document.createElement("div");
+  //           wrapper.className = "relative group";
+
+  //           const [lantaiIdx, ruanganIdx] = nav.goto.split("-").map(Number);
+  //           const targetLoc =
+  //             lantaiData[lantaiIdx].ruangan[ruanganIdx]?.loc || "Unknown";
+
+  //           const icon = document.createElement("div");
+  //           icon.className =
+  //             "w-10 h-10 bg-orange-600 text-white flex items-center justify-center rounded-full cursor-pointer";
+  //           icon.innerText = "⮝";
+
+  //           const tooltip = document.createElement("div");
+  //           tooltip.className =
+  //             "absolute -top-10 left-1/2 -translate-x-1/2 bg-orange-300 border border-orange-500 text-white text-xs px-2.5 py-1.5 rounded-md shadow-md opacity-0 group-hover:opacity-100 transition-all duration-200 scale-95 group-hover:scale-100 whitespace-nowrap pointer-events-none font-semibold";
+
+  //           tooltip.innerText = targetLoc;
+
+  //           icon.addEventListener("click", () => {
+  //             handleSwitchScene(nav.goto, targetLoc);
+  //           });
+
+  //           wrapper.appendChild(icon);
+  //           wrapper.appendChild(tooltip);
+
+  //           scene.hotspotContainer().createHotspot(wrapper, {
+  //             yaw: nav.yaw,
+  //             pitch: nav.pitch,
+  //           });
+  //         });
+
+  //         dynamicScenes.push({ id, scene });
+  //       });
+  //     });
+
+  //     scenesRef.current = dynamicScenes;
+
+  //     dynamicScenes[0]?.scene.switchTo();
+  //   });
+  // }, [lantaiData]);
 
   return (
     <div className="flex justify-center items-center h-screen">
       <div className={`relative w-screen h-screen`}>
         <div ref={panoRef} className={`w-full h-full marzipano-container `} />
 
-        <div className="absolute top-5 left-5 flex gap-2">
+        <div className="absolute top-5 left-5 gap-10 flex  justify-center flex-col">
           <button
             onClick={() => setShowModal(true)}
-            className=" bg-blue-600 text-white px-4 py-2 rounded-xl shadow-lg cursor-pointer"
+            className=" bg-blue-600 text-white w-26 py-2 rounded-lg shadow-lg cursor-pointer"
             style={{ zIndex: 10 }}
           >
-            Pilih Lokasi
+            Pilih Lantai
           </button>
+
+          <div className="relative w-[220px]">
+            <div
+              className="bg-white border border-gray-300 rounded-md py-2 px-3 flex justify-between items-center cursor-pointer shadow-sm hover:border-gray-400 transition duration-150"
+              onClick={toggleDropdown}
+            >
+              <p className="text-sm font-medium text-gray-700">
+                {selected ? selected : "Choose a Room"}
+              </p>
+
+              <div className="text-gray-600">
+                {openDropdown ? (
+                  <FontAwesomeIcon icon={faAngleUp} />
+                ) : (
+                  <FontAwesomeIcon icon={faAngleDown} />
+                )}
+              </div>
+            </div>
+
+            {openDropdown && (
+              <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-20 max-h-60 overflow-auto animate-fadeIn">
+                {floorRoom?.map((item, index) => (
+                  <div
+                    key={index}
+                    className="py-2 px-3 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer transition"
+                    onClick={() => handleSwitchScene(item.sceneId, item.name)}
+                  >
+                    {item.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {showModal && (
@@ -172,11 +375,11 @@ const MarzipanoPage = () => {
                 </button>
               </div>
               <div className="w-full flex-wrap xl:flex-nowrap flex gap-2 my-5 justify-center">
-                {lantaiData?.map((item: any) => (
+                {floors.floors?.map((item: any) => (
                   <button
                     key={item?.id}
                     className={`w-1/3 bg-gray-400 hover:bg-gray-600 py-2 text-white rounded-lg cursor-pointer`}
-                    onClick={() => setIdRuangan(item.id)}
+                    onClick={() => ruanganSet(item.id)}
                   >
                     <p>{item?.name}</p>
                   </button>
@@ -186,14 +389,14 @@ const MarzipanoPage = () => {
               <div className="relative hidden lg:block overflow-hidden">
                 <img src={denah} alt="denah" className="w-full " />
 
-                {findLantai.map((item, index) => (
+                {floorRoom?.map((item, index) => (
                   <div
                     className=" absolute  lg:h-4 lg:w-4  flex items-center px-1  bg-red-500 hover:bg-red-200 rounded-full cursor-pointer "
                     style={{
-                      left: `${item.position.x}%`,
-                      top: `${item.position.y}%`,
+                      left: `${item.pos_x}%`,
+                      top: `${item.pos_y}%`,
                     }}
-                    onClick={() => handleSwitchScene(item.sceneId)}
+                    onClick={() => handleSwitchScene(item.sceneId, item.name)}
                   ></div>
                 ))}
               </div>
@@ -215,15 +418,15 @@ const MarzipanoPage = () => {
                     style={{ width: "100%", height: "auto" }}
                   />
 
-                  {findLantai.map((item, index) => (
+                  {floorRoom?.map((item, index) => (
                     <div
                       key={index}
                       className="absolute lg:h-4 lg:w-4 w-2 h-2 bg-red-500 hover:bg-red-300 rounded-full cursor-pointer"
+                      onClick={() => handleSwitchScene(item.sceneId, item.name)}
                       style={{
-                        left: `${item.position.x}%`,
-                        top: `${item.position.y}%`,
+                        left: `${item.pos_x}%`,
+                        top: `${item.pos_y}%`,
                       }}
-                      onClick={() => handleSwitchScene(item.sceneId)}
                     />
                   ))}
                 </div>
