@@ -19,13 +19,13 @@ const MarzipanoPage = () => {
 
   const toggleDropdown = () => setOpenDropdown(!openDropdown);
 
-  console.log("selected: ", selected);
-
   // Zustand
 
   const floors = useMapStore((state) => state.floors);
   const floorById = useMapStore((state) => state.floorById);
   const floorId = useMapStore((state) => state.floorId);
+
+  console.log("floorByID: ", floorById);
 
   const fetchGetAllFloorsWithRooms = useMapStore(
     (state) => state.fetchGetAllFloorsWithRooms,
