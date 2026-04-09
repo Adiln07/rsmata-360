@@ -4,7 +4,7 @@ export const mapApi = {
   getAllFloorsWithRooms: async () => {
     try {
       const response = await AxiosConfig.get("/api/map/floor-with-rooms");
-      return response;
+      return response.data;
     } catch (error) {
       throw new Error("Failed Get Api All Floors With Rooms");
     }
@@ -12,8 +12,13 @@ export const mapApi = {
 
   getFloorWithRoomById: async (id: number) => {
     try {
-      const response = await AxiosConfig.get(`/api/map/floor-with-rooms/${id}`);
-      return response;
+      const response = await AxiosConfig.get(
+        `/api/map/floor-with-rooms/detail`,
+        {
+          params: { id },
+        },
+      );
+      return response.data;
     } catch (error) {
       throw new Error("Failed Get Api Floor With Room By Id");
     }

@@ -34,7 +34,7 @@ type MapStrore = {
 export const useMapStore = create<MapStrore>((set) => ({
   floors: [],
   floorById: null,
-  floorId: 4,
+  floorId: 1,
   loading: false,
   error: null,
 
